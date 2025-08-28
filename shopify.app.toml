@@ -1,0 +1,23 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "7b6ddfd75a27626c1ca7e06cb35fc67c"
+name = "TapitaTraning2"
+application_url = "https://men-china-upc-garbage.trycloudflare.com"
+embedded = true
+handle = "tapitatraning2"
+
+[webhooks]
+api_version = "2025-07"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_products"
+
+[auth]
+redirect_urls = ["https://men-china-upc-garbage.trycloudflare.com/auth/callback", "https://men-china-upc-garbage.trycloudflare.com/auth/shopify/callback", "https://men-china-upc-garbage.trycloudflare.com/api/auth/callback"]
+
+[pos]
+embedded = false
+
+[build]
+automatically_update_urls_on_dev = true
