@@ -14,12 +14,30 @@ import { Redirect } from "@shopify/app-bridge/actions";
  *
  * @returns {Function} fetch function
  */
+
 export function useAuthenticatedFetch() {
   const app = useAppBridge();
   const fetchFunction = authenticatedFetch(app);
 
+  // Helper to get shop from browser URL
+  function getShopFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("shop");
+  }
+
   return async (uri, options) => {
-    const response = await fetchFunction(uri, options);
+    let urlObj;
+    try {
+      urlObj = new URL(uri, window.location.origin);
+    } catch {
+      // If uri is relative, prepend origin
+      urlObj = new URL(window.location.origin + uri);
+    }
+    const shop = getShopFromUrl();
+    if (shop && !urlObj.searchParams.get("shop")) {
+      urlObj.searchParams.append("shop", shop);
+    }
+    const response = await fetchFunction(urlObj.toString(), options);
     checkHeadersForReauthorization(response.headers, app);
     return response;
   };

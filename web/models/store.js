@@ -73,6 +73,13 @@ const storeSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  access_token: {
+    type: String,
+    required: true
+  },
+  updated_at: {
+    type: String
+  }
 });
 
 export default mongoose.model('Store', storeSchema);

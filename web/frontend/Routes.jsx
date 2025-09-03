@@ -1,4 +1,5 @@
 import { Routes as ReactRouterRoutes, Route } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 
 /**
  * File-based routing.
@@ -24,6 +25,7 @@ export default function Routes({ pages }) {
 
   return (
     <ReactRouterRoutes>
+      <Route path="/" element={<Navigate to="/admin/login" replace />} />
       {routeComponents}
       <Route path="*" element={<NotFound />} />
     </ReactRouterRoutes>

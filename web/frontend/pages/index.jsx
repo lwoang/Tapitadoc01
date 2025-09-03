@@ -20,7 +20,7 @@ export default function HomePage() {
   const { t } = useTranslation();
   return (
     <Page narrowWidth>
-      <TitleBar title={t("HomePage.title")} />
+      {/* <TitleBar title={t("HomePage.title")} /> */}
       <Layout>
         <Layout.Section>
           <Card sectioned>

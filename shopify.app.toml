@@ -2,7 +2,7 @@
 
 client_id = "7b6ddfd75a27626c1ca7e06cb35fc67c"
 name = "TapitaTraning2"
-application_url = "https://men-china-upc-garbage.trycloudflare.com"
+application_url = "https://ph-prospects-expense-biology.trycloudflare.com"
 embedded = true
 handle = "tapitatraning2"
 
@@ -14,7 +14,7 @@ api_version = "2025-07"
 scopes = "write_products"
 
 [auth]
-redirect_urls = ["https://men-china-upc-garbage.trycloudflare.com/auth/callback", "https://men-china-upc-garbage.trycloudflare.com/auth/shopify/callback", "https://men-china-upc-garbage.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://ph-prospects-expense-biology.trycloudflare.com/auth/callback", "https://ph-prospects-expense-biology.trycloudflare.com/auth/shopify/callback", "https://ph-prospects-expense-biology.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false

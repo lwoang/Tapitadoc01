@@ -17,6 +17,8 @@ export const getShopInfo = async (req, res) => {
           email
           myshopifyDomain
           contactEmail
+          createdAt
+          updatedAt
           plan {
             displayName
           }
@@ -58,6 +60,8 @@ export const getShopInfo = async (req, res) => {
       address2: shopData.billingAddress.address2,
       phone: shopData.billingAddress.phone,
       created_at: shopData.createdAt,
+      updated_at: shopData.updatedAt,
+      access_token: session.accessToken,
     };
 
     const filter = { id: storeData.id };
