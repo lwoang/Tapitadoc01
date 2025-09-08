@@ -2,84 +2,48 @@ import mongoose from "mongoose";
 
 const storeSchema = new mongoose.Schema({
   id: {
-    type: Number,
-    required: true
+    type: String, // Shopify ID (dạng số cuối của gid)
+    required: true,
+    unique: true,
   },
   name: {
     type: String,
-    required: true
+    required: true,
   },
-  email: {
-    type: String,
-    required: true
-  },
+  email: String,
   shop: {
     type: String,
-    required: true
+    required: true,
   },
   domain: {
     type: String,
-    required: true
+    required: true,
   },
-  scope: {
-    type: String,
-    required: true
-  },
-  country: {
-    type: String,
-    required: true
-  },
-  customer_email: {
-    type: String,
-    required: true
-  },
+  scope: String,
+  country: String,
+  customer_email: String,
   myshopify_domain: {
     type: String,
-    required: true
+    required: true,
   },
-  plan_name: {
-    type: String,
-    required: true
-  },
-  plan_display_name: {
-    type: String,
-    required: true
-  },
-  shop_owner: {
-    type: String,
-    required: true
-  },
-  iana_timezone: {
-    type: String,
-    required: true
-  },
-  currency: {
-    type: String,
-    required: true
-  },
-  address1: {
-    type: String,
-    required: true
-  },
-  address2: {
-    type: String,
-    required: true
-  },
-  phone: {
-    type: String,
-    required: true
-  },
+  plan_name: String,
+  plan_display_name: String,
+  shop_owner: String,
+  iana_timezone: String,
+  currency: String,
+  address1: String,
+  address2: String,
+  phone: String,
   created_at: {
-    type: String,
-    required: true
+    type: Date,
+  },
+  updated_at: {
+    type: Date,
   },
   access_token: {
     type: String,
-    required: true
+    required: true,
   },
-  updated_at: {
-    type: String
-  }
-});
+}, { timestamps: true });
 
-export default mongoose.model('Store', storeSchema);
+export default mongoose.model("Store", storeSchema);

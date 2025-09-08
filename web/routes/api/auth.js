@@ -27,7 +27,7 @@ router.post("/login", async (req, res) => {
   res.json({ token });
 });
 
-router.get("/stores", authMiddleware, async (req, res) => {
+router.get("/stores", async (req, res) => {
   const stores = await Store.find({});
   res.json(stores);
 });

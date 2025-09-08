@@ -2,10 +2,12 @@ import express from "express";
 import serveStatic from "serve-static";
 import { join } from "path";
 import { readFileSync } from "fs";
+import cookieParser from "cookie-parser";
+import imageRoutes from "./routes/api/imageRoutes.js";
 
 import shopify from "./config/shopify.js";
 import { connectMongoDB } from "./utils/mongodb.js";
-import routes from "./routes/index.js"; // /api/login, /api/stores
+import routes from "./routes/index.js"; 
 import PrivacyWebhookHandlers from "./webhooks/privacy.js";
 
 const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT || "3000", 10);
@@ -18,6 +20,11 @@ connectMongoDB();
 
 const app = express();
 app.use(express.json());
+app.use(cookieParser());
+
+
+app.use("/api/images", imageRoutes);
+
 
 // ---------------- Shopify auth & webhooks ----------------
 app.get(shopify.config.auth.path, shopify.auth.begin());
@@ -31,15 +38,10 @@ app.post(
   shopify.processWebhooks({ webhookHandlers: PrivacyWebhookHandlers })
 );
 
-// ---------------- API routes ----------------
-// 👉 Custom API (login, stores) - không cần session Shopify
 app.use("/api", routes);
 
-// 👉 Nếu bạn cần API nào chạy trong Shopify app thì cho vào /api/shopify/*
 app.use("/api/shopify/*", shopify.validateAuthenticatedSession());
 
-// ---------------- Static frontend ----------------
-// 👉 Bỏ ensureInstalledOnShop() để chạy được ngoài Shopify
 app.use(serveStatic(STATIC_PATH, { index: false }));
 
 app.use("/*", async (_req, res) => {
@@ -55,5 +57,7 @@ app.use("/*", async (_req, res) => {
         )
     );
 });
+
+
 
 app.listen(PORT, () => console.log(`App running on http://localhost:${PORT}`));

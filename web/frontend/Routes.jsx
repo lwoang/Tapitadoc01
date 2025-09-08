@@ -25,7 +25,7 @@ export default function Routes({ pages }) {
 
   return (
     <ReactRouterRoutes>
-      <Route path="/" element={<Navigate to="/admin/login" replace />} />
+      <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
       {routeComponents}
       <Route path="*" element={<NotFound />} />
     </ReactRouterRoutes>

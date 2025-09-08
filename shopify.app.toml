@@ -2,7 +2,7 @@
 
 client_id = "7b6ddfd75a27626c1ca7e06cb35fc67c"
 name = "TapitaTraning2"
-application_url = "https://ph-prospects-expense-biology.trycloudflare.com"
+application_url = "https://cognitive-egg-charging-privilege.trycloudflare.com"
 embedded = true
 handle = "tapitatraning2"
 
@@ -11,10 +11,10 @@ api_version = "2025-07"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products"
+scopes = "write_products, write_files, read_products, read_files, read_content, write_content"
 
 [auth]
-redirect_urls = ["https://ph-prospects-expense-biology.trycloudflare.com/auth/callback", "https://ph-prospects-expense-biology.trycloudflare.com/auth/shopify/callback", "https://ph-prospects-expense-biology.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://cognitive-egg-charging-privilege.trycloudflare.com/auth/callback", "https://cognitive-egg-charging-privilege.trycloudflare.com/auth/shopify/callback", "https://cognitive-egg-charging-privilege.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false

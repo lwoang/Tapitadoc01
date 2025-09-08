@@ -5,24 +5,16 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      window.location.href = "/admin/login";
-      return;
-    }
-
-    fetch("/api/stores", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => {
-        if (res.status === 401 || res.status === 403) {
-          localStorage.removeItem("token");
-          window.location.href = "/admin/login";
-        }
-        return res.json();
-      })
+    fetch("/api/stores")
+      .then((res) => res.json())
       .then((data) => {
-        setStores(data);
+        if (Array.isArray(data)) {
+          setStores(data);
+        } else if (data.shop) {
+          setStores([data.shop]);
+        } else {
+          setStores([]);
+        }
         setLoading(false);
       });
   }, []);
@@ -59,14 +51,14 @@ export default function Dashboard() {
               <th className="p-3 text-left">Country</th>
               <th className="p-3 text-left">Plan</th>
               <th className="p-3 text-left">Scope</th>
-              <th className="p-3 text-left">Installed At</th>
+              <th className="p-3 text-left">Created At</th>
               <th className="p-3 text-left">Updated At</th>
             </tr>
           </thead>
           <tbody>
             {stores.map((s) => (
               <tr key={s._id} className="border-t hover:bg-gray-50">
-                <td className="p-3 font-semibold">{s.shop}</td>
+                <td className="p-3 font-semibold">{s.name}</td>
                 <td className="p-3">{s.shop_owner || "-"}</td>
                 <td className="p-3">{s.email || s.customer_email || "-"}</td>
                 <td className="p-3">{s.domain || s.myshopify_domain}</td>
@@ -74,10 +66,10 @@ export default function Dashboard() {
                 <td className="p-3">{s.plan_display_name || s.plan_name || "-"}</td>
                 <td className="p-3">{s.scope || "-"}</td>
                 <td className="p-3">
-                  {s.installedAt ? new Date(s.installedAt).toLocaleString() : "-"}
+                  {s.created_at ? new Date(s.created_at).toLocaleString() : "-"}
                 </td>
                 <td className="p-3">
-                  {s.updatedAt ? new Date(s.updatedAt).toLocaleString() : "-"}
+                  {s.updated_at ? new Date(s.updated_at).toLocaleString() : "-"}
                 </td>
               </tr>
             ))}

@@ -19,9 +19,9 @@ export default function App() {
             {/* <Link to="/" rel="" /> */}
             {/* <Link to="/admin/login">Login</Link>
             <Link to="/pagename">Page Name</Link>
-            <Link to="/dashboard">Dashboard</Link>
+            <Link to="/dashboard">Dashboard</Link> */}
             <Link to="/admin/edit-content">Edit Content</Link>
-            <Link to="/admin/optimize-image">Optimize Image</Link> */}
+            <Link to="/admin/optimize-image">Optimize Image</Link>
           </NavMenu>
           <Routes pages={pages} />
         </QueryProvider>
