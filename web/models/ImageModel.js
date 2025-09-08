@@ -10,7 +10,6 @@ const ImageSchema = new mongoose.Schema(
     productType: { type: String },
     status: { type: String, default: "unoptimized" },
     src: { type: String },
-    originalSrc: { type: String },
     optimizedUrl: { type: String },
     resourceUrl: { type: String },
     mediaId: { type: String },
@@ -22,7 +21,7 @@ const ImageSchema = new mongoose.Schema(
     optimizedAt: { type: Date },
     filename: { type: String }
   },
-  { timestamps: true } // tự động tạo createdAt + updatedAt
+  { timestamps: true } 
 );
 
 export default mongoose.model("Image", ImageSchema);

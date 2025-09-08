@@ -112,11 +112,15 @@ router.get("/shopify", shopify.validateAuthenticatedSession(), async (req, res) 
         const image = imageEdge.node;
         const imageId = image.id.split("/").pop();
 
-        // Lấy bản ghi cũ trong DB (nếu có)
+        // Lấy bản ghi cũ trong DB nếu có
         const existing = await ImageModel.findOne({ productId, imageId });
 
-        // Nếu bản ghi có optimizedUrl thì coi như đã optimize
-        const isOptimized = !!(existing && existing.optimizedUrl);
+        // Xác định ảnh đã optimize dựa vào DB cũ hoặc tên file / altText
+        const isOptimized = !!(
+          existing?.optimized === true ||
+          (image.url && image.url.includes("optimized_")) ||
+          (image.altText && image.altText.includes("Optimized"))
+        );
 
         await ImageModel.findOneAndUpdate(
           { productId, imageId },
@@ -125,10 +129,9 @@ router.get("/shopify", shopify.validateAuthenticatedSession(), async (req, res) 
               productTitle: product.title,
               productType: product.productType || "Không xác định",
               src: image.url,
-              originalSrc: image.url,
               altText: image.altText || product.title,
-              optimized: existing?.optimized === true ? true : isOptimized,
-              status: existing?.optimized === true ? "optimized" : (isOptimized ? "optimized" : "unoptimized"),
+              optimized: isOptimized,
+              status: isOptimized ? "optimized" : "unoptimized",
             },
             $setOnInsert: {
               productGid: product.id,
@@ -143,7 +146,6 @@ router.get("/shopify", shopify.validateAuthenticatedSession(), async (req, res) 
 
     // Chỉ lấy ảnh chưa optimize từ DB
     const images = await ImageModel.find({ optimized: false });
-
     res.json({
       success: true,
       images
@@ -159,11 +161,13 @@ router.get("/shopify", shopify.validateAuthenticatedSession(), async (req, res) 
 
 
 
+
 // Optimize ảnh 
+// Optimize ảnh & lưu DB trước khi upload
 router.post("/optimize", shopify.validateAuthenticatedSession(), upload.single("file"), async (req, res) => {
   try {
     const file = req.file;
-    const { productId, imageId } = req.body;
+    const { productId, imageId, productTitle, altText, originalUrl } = req.body;
 
     if (!file || !productId || !imageId) {
       return res.status(400).json({ 
@@ -172,13 +176,30 @@ router.post("/optimize", shopify.validateAuthenticatedSession(), upload.single("
       });
     }
 
-    const session = res.locals.shopify.session;
-    const client = new shopify.api.clients.Graphql({ session });
+    // --- 1. Lưu tạm bản ghi DB trước ---
+    const tempRecord = await ImageModel.findOneAndUpdate(
+      { productId, imageId },
+      {
+        $set: {
+          productTitle: productTitle || "Không xác định",
+          src: originalUrl || null,
+          altText: altText || productTitle || "No Alt",
+          optimized: true,
+          status: "optimized",
+          optimizedAt: new Date(),
+          filename: `pending_${Date.now()}.jpg`,
+        },
+        $setOnInsert: {
+          productGid: productId.startsWith("gid://") ? productId : `gid://shopify/Product/${productId}`,
+          imageGid: imageId,
+          compressionRatio: null
+        }
+      },
+      { upsert: true, new: true }
+    );
 
-    // Kích thước gốc
+    // --- 2. Optimize ảnh bằng Sharp ---
     const originalSize = file.buffer.length;
-
-    // Optimize bằng Sharp
     let optimizedBuffer;
     try {
       optimizedBuffer = await sharp(file.buffer)
@@ -186,7 +207,7 @@ router.post("/optimize", shopify.validateAuthenticatedSession(), upload.single("
         .jpeg({ quality: 85, progressive: true })
         .toBuffer();
     } catch {
-      optimizedBuffer = file.buffer; // fallback
+      optimizedBuffer = file.buffer;
     }
 
     const optimizedSize = optimizedBuffer.length;
@@ -194,42 +215,39 @@ router.post("/optimize", shopify.validateAuthenticatedSession(), upload.single("
       ? `${((originalSize - optimizedSize) / originalSize * 100).toFixed(1)}%` 
       : "0%";
 
-    const productGid = productId.startsWith("gid://") 
-      ? productId 
-      : `gid://shopify/Product/${productId}`;
-
-    // Upload ảnh optimized lên Shopify
+    const session = res.locals.shopify.session;
+    const client = new shopify.api.clients.Graphql({ session });
+    const shopifyProductGid = productId.startsWith("gid://") ? productId : `gid://shopify/Product/${productId}`;
     const filename = `optimized_${Date.now()}.jpg`;
-    const uploadResult = await uploadToShopifyStaged(client, optimizedBuffer, filename, productGid);
 
-    // Cập nhật trực tiếp bản ghi cũ
+    // --- 3. Upload lên Shopify ---
+    const uploadResult = await uploadToShopifyStaged(client, optimizedBuffer, filename, shopifyProductGid);
+
+    // --- 4. Cập nhật lại bản ghi DB với thông tin upload ---
     const updated = await ImageModel.findOneAndUpdate(
-      { productId, imageId }, 
+      { productId, imageId },
       {
         $set: {
           optimizedUrl: uploadResult.mediaUrl || uploadResult.resourceUrl,
           resourceUrl: uploadResult.resourceUrl,
           mediaId: uploadResult.mediaId || null,
           optimized: true,
-          isOptimizedUpload: true,    
           status: "optimized",
           originalSize,
           optimizedSize,
           compressionRatio,
           optimizedAt: new Date(),
           filename,
-          // lưu lại url gốc để biết ảnh này optimize từ đâu
-          originalUrl: req.body.originalUrl || null
+          originalUrl: originalUrl || tempRecord.src
         }
       },
-      { upsert: true, new: true }
+      { new: true }
     );
 
     res.json({
       success: true,
       optimized: true,
-      newUrl: updated.optimizedUrl, 
-      url: updated.optimizedUrl,    
+      newUrl: updated.optimizedUrl,
       compressionRatio,
       originalSize: `${(originalSize / 1024).toFixed(2)} KB`,
       optimizedSize: `${(optimizedSize / 1024).toFixed(2)} KB`,
@@ -240,12 +258,10 @@ router.post("/optimize", shopify.validateAuthenticatedSession(), upload.single("
 
   } catch (err) {
     console.error("Optimize error:", err.message);
-    res.status(500).json({ 
-      success: false, 
-      error: err.message 
-    });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 
 // Hàm upload
@@ -305,7 +321,7 @@ async function uploadToShopifyStaged(client, fileBuffer, filename, productId) {
           media: [{ 
             originalSource: stagedTarget.resourceUrl, 
             mediaContentType: "IMAGE", 
-            alt: `Optimized - ${filename}`   // <--- altText để biết ảnh đã optimize
+            alt: `Optimized - ${filename}`   // <--- altText 
           }]
         }
       }
