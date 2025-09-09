@@ -10,6 +10,8 @@ import {
   Toast,
   Frame,
   Banner,
+  Text,
+  Tooltip,
 } from "@shopify/polaris";
 import Compressor from "compressorjs";
 
@@ -153,15 +155,28 @@ export default function ManageShopifyImages() {
     );
   };
 
+  const truncateText = (text, maxLength = 30) => {
+    if (!text) return "Không có altText";
+    return text.length > maxLength ? text.substring(0, maxLength) + "…" : text;
+  };
+
   const rows = shopifyImages.map((item) => [
     <Thumbnail
       source={item.src}
       alt={item.productTitle || item.altText}
       size="small"
     />,
-    item.productTitle || "Không có tên",
+    <Tooltip content={item.productTitle || "Không có tên sản phẩm"}>
+      <Text as="span" truncate>
+        {truncateText(item.productTitle)}
+      </Text>
+    </Tooltip>,
     item.productType || "Không xác định",
-    item.altText || "Không có altText",
+    <Tooltip content={item.altText || "Không có altText"}>
+      <Text as="span" truncate>
+        {truncateText(item.altText)}
+      </Text>
+    </Tooltip>,
     getStatusBadge(item),
     getActionButton(item),
   ]);
@@ -187,7 +202,7 @@ export default function ManageShopifyImages() {
       >
         {shopifyImages.length === 0 && !loadingShopify && (
           <Banner tone="success">
-            <p>🎉 Tất cả ảnh đã được tối ưu hóa! Không có ảnh nào cần xử lý.</p>
+            <p> Tất cả ảnh đã được tối ưu hóa! Không có ảnh nào cần xử lý.</p>
           </Banner>
         )}
 
