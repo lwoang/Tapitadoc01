@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, TextContainer, Text } from "@shopify/polaris";
+import { Card, BlockStack, Text } from "@shopify/polaris";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "react-query";
@@ -59,7 +59,7 @@ export function ProductsCard() {
         loading: isPopulating,
       }}
     >
-      <TextContainer spacing="loose">
+      <BlockStack spacing="loose">
         <p>{t("ProductsCard.description")}</p>
         <Text as="h4" variant="headingMd">
           {t("ProductsCard.totalProductsHeading")}
@@ -67,7 +67,7 @@ export function ProductsCard() {
             {isLoadingCount ? "-" : data?.count}
           </Text>
         </Text>
-      </TextContainer>
+      </BlockStack>
     </Card>
   );
 }

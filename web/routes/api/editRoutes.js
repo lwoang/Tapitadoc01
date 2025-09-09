@@ -323,8 +323,9 @@ router.post("/ai/suggest", async (req, res) => {
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    const prompt = `Hãy viết duy nhất một mô tả ngắn gọn (1-2 câu), hấp dẫn và giàu cảm xúc cho ${type} có tiêu đề: "${title}". 
-Không đưa ra nhiều lựa chọn, không giải thích, chỉ xuất ra một đoạn văn hoàn chỉnh.`;
+    const prompt = `Write a single short description (1 - 2 sentences), engaging and emotionally appealing, for the ${type} with the title: "${title}". 
+Do not provide multiple options, do not explain, only output one complete paragraph.
+`;
 
     const result = await model.generateContent(prompt);
     const suggestion = result.response.text();

@@ -55,10 +55,8 @@ export default defineConfig({
     port: process.env.FRONTEND_PORT,
     hmr: hmrConfig,
     proxy: {
-      // Proxy cho API lấy thông tin sản phẩm và các API khác
       "^/(\\?.*)?$": proxyOptions,
       "^/api(/|(\\?.*)?$)": proxyOptions,
-      // Thêm proxy rule mới cho API lấy tên cửa hàng
       "^/api/shop/info": proxyOptions,
     },
   },

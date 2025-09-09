@@ -1,4 +1,4 @@
-import { Card, TextContainer, Text, Stack, Badge } from "@shopify/polaris";
+import { Card, BlockStack, Text, InlineStack, Badge } from "@shopify/polaris";
 import { useQuery } from "react-query";
 import { useMemo } from "react";
 
@@ -34,7 +34,7 @@ export function ShopInfoCard() {
 
   return (
     <Card title="Shop Information" sectioned>
-      <TextContainer spacing="loose">
+      <BlockStack spacing="loose">
         {isLoading && <p>Loading shop info...</p>}
 
         {error && (
@@ -45,14 +45,14 @@ export function ShopInfoCard() {
 
         {data && data.shop && (
           <>
-            <Stack alignment="center">
+            <InlineStack alignment="center">
               <Text as="h4" variant="headingMd">
                 {data.shop.name || "N/A"}
               </Text>
               {data.shop.plan?.displayName && (
                 <Badge status="info">{data.shop.plan.displayName}</Badge>
               )}
-            </Stack>
+            </InlineStack>
 
             <p>
               <strong>ID:</strong> {data.shop.id || "N/A"}
@@ -68,7 +68,7 @@ export function ShopInfoCard() {
             </p>
 
             {data.shop.billingAddress && Object.keys(data.shop.billingAddress).length > 0 && (
-              <Stack vertical spacing="extraTight" style={{ marginTop: "10px" }}>
+              <InlineStack vertical spacing="extraTight" style={{ marginTop: "10px" }}>
                 <Text as="h5" variant="headingSm">
                   Billing Address
                 </Text>
@@ -80,11 +80,11 @@ export function ShopInfoCard() {
                     </p>
                   ) : null
                 )}
-              </Stack>
+              </InlineStack>
             )}
           </>
         )}
-      </TextContainer>
+      </BlockStack>
     </Card>
   );
 }

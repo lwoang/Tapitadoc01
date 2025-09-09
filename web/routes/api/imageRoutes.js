@@ -89,22 +89,35 @@ router.get("/shopify", shopify.validateAuthenticatedSession(), async (req, res) 
     const session = res.locals.shopify.session;
     const client = new shopify.api.clients.Graphql({ session });
 
-    // Lấy dữ liệu từ Shopify
-    const result = await client.query({
-      data: {
-        query: PRODUCTS_WITH_IMAGES_QUERY,
-        variables: { first: 50, after: null }
-      }
-    });
+    let allProducts = [];
+    let after = null;
+    let hasNextPage = true;
 
-    if (result.body.errors) {
-      throw new Error(`GraphQL errors: ${JSON.stringify(result.body.errors)}`);
+    // --- 1. Lặp phân trang để lấy tất cả sản phẩm ---
+    while (hasNextPage) {
+      const result = await client.query({
+        data: {
+          query: PRODUCTS_WITH_IMAGES_QUERY,
+          variables: { first: 50, after }
+        }
+      });
+
+      if (result.body.errors) {
+        throw new Error(`GraphQL errors: ${JSON.stringify(result.body.errors)}`);
+      }
+
+      const products = result.body.data.products.edges;
+      allProducts.push(...products);
+
+      const pageInfo = result.body.data.products.pageInfo;
+      hasNextPage = pageInfo.hasNextPage;
+      after = pageInfo.endCursor;
     }
 
-    const products = result.body.data.products.edges;
+    // --- 2. Đồng bộ tất cả ảnh với DB ---
+    const updatePromises = [];
 
-    // Đồng bộ dữ liệu với DB
-    for (const productEdge of products) {
+    for (const productEdge of allProducts) {
       const product = productEdge.node;
       const productId = product.id.split("/").pop();
 
@@ -112,57 +125,70 @@ router.get("/shopify", shopify.validateAuthenticatedSession(), async (req, res) 
         const image = imageEdge.node;
         const imageId = image.id.split("/").pop();
 
-        // Lấy bản ghi cũ trong DB nếu có
-        const existing = await ImageModel.findOne({ productId, imageId });
+        updatePromises.push(
+          (async () => {
+            try {
+              const existing = await ImageModel.findOne({ productId, imageId });
 
-        // Xác định ảnh đã optimize dựa vào DB cũ hoặc tên file / altText
-        const isOptimized = !!(
-          existing?.optimized === true ||
-          (image.url && image.url.includes("optimized_")) ||
-          (image.altText && image.altText.includes("Optimized"))
-        );
+              const isOptimized = !!(
+                existing?.optimized === true ||
+                (image.url && image.url.includes("optimized_")) ||
+                (image.altText && image.altText.includes("Optimized"))
+              );
 
-        await ImageModel.findOneAndUpdate(
-          { productId, imageId },
-          {
-            $set: {
-              productTitle: product.title,
-              productType: product.productType || "Không xác định",
-              src: image.url,
-              altText: image.altText || product.title,
-              optimized: isOptimized,
-              status: isOptimized ? "optimized" : "unoptimized",
-            },
-            $setOnInsert: {
-              productGid: product.id,
-              imageGid: image.id,
-              compressionRatio: null
+              await ImageModel.findOneAndUpdate(
+                { productId, imageId },
+                {
+                  $set: {
+                    productTitle: product.title,
+                    productType: product.productType || "Không xác định",
+                    src: image.url,
+                    altText: image.altText || product.title,
+                    optimized: isOptimized,
+                    status: isOptimized ? "optimized" : "unoptimized",
+                    originalSize: existing?.originalSize || null,
+                    optimizedSize: existing?.optimizedSize || null,
+                    compressionRatio: existing?.compressionRatio || null
+                  },
+                  $setOnInsert: {
+                    productGid: product.id,
+                    imageGid: image.id,
+                    filename: null,
+                    optimizedAt: null
+                  }
+                },
+                { upsert: true, new: true }
+              );
+            } catch (err) {
+              console.error(`DB update failed for productId=${productId}, imageId=${imageId}:`, err);
             }
-          },
-          { upsert: true, new: true }
+          })()
         );
       }
     }
 
-    // Chỉ lấy ảnh chưa optimize từ DB
-    const images = await ImageModel.find({ optimized: false });
+    // Chờ tất cả update hoàn tất
+    await Promise.all(updatePromises);
+
+    // --- 3. Lấy tất cả ảnh từ DB ---
+    const images = await ImageModel.find({}).lean();
+
     res.json({
       success: true,
-      images
+      images: images.map(img => ({
+        ...img,
+        originalSizeKb: img.originalSize ? `${(img.originalSize / 1024).toFixed(2)} KB` : null,
+        optimizedSizeKb: img.optimizedSize ? `${(img.optimizedSize / 1024).toFixed(2)} KB` : null
+      }))
     });
   } catch (err) {
-    console.error("Fetch Shopify images error:", err.message);
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
+    console.error("Fetch Shopify images error:", err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
 
 
-
-// Optimize ảnh 
 // Optimize ảnh & lưu DB trước khi upload
 router.post("/optimize", shopify.validateAuthenticatedSession(), upload.single("file"), async (req, res) => {
   try {
@@ -176,54 +202,27 @@ router.post("/optimize", shopify.validateAuthenticatedSession(), upload.single("
       });
     }
 
-    // --- 1. Lưu tạm bản ghi DB trước ---
-    const tempRecord = await ImageModel.findOneAndUpdate(
-      { productId, imageId },
-      {
-        $set: {
-          productTitle: productTitle || "Không xác định",
-          src: originalUrl || null,
-          altText: altText || productTitle || "No Alt",
-          optimized: true,
-          status: "optimized",
-          optimizedAt: new Date(),
-          filename: `pending_${Date.now()}.jpg`,
-        },
-        $setOnInsert: {
-          productGid: productId.startsWith("gid://") ? productId : `gid://shopify/Product/${productId}`,
-          imageGid: imageId,
-          compressionRatio: null
-        }
-      },
-      { upsert: true, new: true }
-    );
-
-    // --- 2. Optimize ảnh bằng Sharp ---
-    const originalSize = file.buffer.length;
-    let optimizedBuffer;
-    try {
-      optimizedBuffer = await sharp(file.buffer)
-        .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
-        .jpeg({ quality: 85, progressive: true })
-        .toBuffer();
-    } catch {
-      optimizedBuffer = file.buffer;
-    }
-
+    // --- 1. Dung lượng ảnh đã optimize từ frontend ---
+    const optimizedBuffer = file.buffer;
     const optimizedSize = optimizedBuffer.length;
+
+    // Nếu có originalSize từ frontend thì dùng, nếu không backend không cần tính lại
+    const originalSize = req.body.originalSize ? parseInt(req.body.originalSize) : optimizedSize;
     const compressionRatio = originalSize > 0 
       ? `${((originalSize - optimizedSize) / originalSize * 100).toFixed(1)}%` 
       : "0%";
 
+    // --- 2. Upload lên Shopify ---
     const session = res.locals.shopify.session;
     const client = new shopify.api.clients.Graphql({ session });
-    const shopifyProductGid = productId.startsWith("gid://") ? productId : `gid://shopify/Product/${productId}`;
+    const shopifyProductGid = productId.startsWith("gid://") 
+      ? productId 
+      : `gid://shopify/Product/${productId}`;
     const filename = `optimized_${Date.now()}.jpg`;
 
-    // --- 3. Upload lên Shopify ---
     const uploadResult = await uploadToShopifyStaged(client, optimizedBuffer, filename, shopifyProductGid);
 
-    // --- 4. Cập nhật lại bản ghi DB với thông tin upload ---
+    // --- 3. Lưu DB ---
     const updated = await ImageModel.findOneAndUpdate(
       { productId, imageId },
       {
@@ -233,24 +232,29 @@ router.post("/optimize", shopify.validateAuthenticatedSession(), upload.single("
           mediaId: uploadResult.mediaId || null,
           optimized: true,
           status: "optimized",
-          originalSize,
-          optimizedSize,
+          originalSize,       
+          optimizedSize,      
           compressionRatio,
           optimizedAt: new Date(),
           filename,
-          originalUrl: originalUrl || tempRecord.src
+          originalUrl,
+          productTitle,
+          altText
         }
       },
-      { new: true }
+      { new: true, upsert: true }
     );
 
+    // --- 4. Trả về ---
     res.json({
       success: true,
       optimized: true,
       newUrl: updated.optimizedUrl,
       compressionRatio,
-      originalSize: `${(originalSize / 1024).toFixed(2)} KB`,
-      optimizedSize: `${(optimizedSize / 1024).toFixed(2)} KB`,
+      originalSize,
+      optimizedSize,
+      originalSizeKb: `${(originalSize / 1024).toFixed(2)} KB`,
+      optimizedSizeKb: `${(optimizedSize / 1024).toFixed(2)} KB`,
       mediaId: updated.mediaId,
       filename: updated.filename,
       isOptimizedUpload: true
@@ -261,6 +265,7 @@ router.post("/optimize", shopify.validateAuthenticatedSession(), upload.single("
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 
 
@@ -340,6 +345,81 @@ async function uploadToShopifyStaged(client, fileBuffer, filename, productId) {
     throw err;
   }
 }
+
+const DELETE_MEDIA_MUTATION = `
+  mutation productDeleteMedia($productId: ID!, $mediaIds: [ID!]!) {
+    productDeleteMedia(productId: $productId, mediaIds: $mediaIds) {
+      deletedMediaIds
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
+
+// Restore ảnh: xóa ảnh đã optimized trên Shopify và reset DB
+router.post("/restore", shopify.validateAuthenticatedSession(), async (req, res) => {
+  try {
+    const { productId, imageId, mediaId } = req.body;
+
+    if (!productId || !imageId) {
+      return res.status(400).json({ success: false, error: "Missing productId or imageId" });
+    }
+
+    const session = res.locals.shopify.session;
+    const client = new shopify.api.clients.Graphql({ session });
+
+    // Xoá media trên Shopify nếu có mediaId
+    if (mediaId) {
+      const productGid = productId.startsWith("gid://") ? productId : `gid://shopify/Product/${productId}`;
+
+      const mediaResult = await client.query({
+        data: {
+          query: DELETE_MEDIA_MUTATION,
+          variables: {
+            productId: productGid,
+            mediaIds: [mediaId],
+          },
+        },
+      });
+
+      const userErrors = mediaResult.body.data?.productDeleteMedia?.userErrors || [];
+      if (userErrors.length > 0) {
+        console.warn(`Shopify delete media errors: ${JSON.stringify(userErrors)}`);
+      }
+    }
+
+
+    //  Cập nhật DB: reset trạng thái ảnh
+    const updated = await ImageModel.findOneAndUpdate(
+      { productId, imageId },
+      {
+        $set: {
+          status: "unoptimized",
+          optimizedUrl: null,
+          mediaId: null,
+          filename: null,
+          optimizedAt: null,
+          optimizedSize: null,
+          compressionRatio: null
+        }
+      },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ success: false, error: "Image not found in DB" });
+    }
+
+    res.json({ success: true, message: "Image restored and Shopify media deleted", image: updated });
+
+  } catch (err) {
+    console.error("Restore error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 
 export default router;
