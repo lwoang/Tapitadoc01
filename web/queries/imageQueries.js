@@ -43,7 +43,21 @@ export const IMAGE_QUERY = `
         }
       }
     `;
-
+export const METAFIELD_SET = `
+mutation metafieldSet($metafields: [MetafieldsSetInput!]!) {
+  metafieldsSet(metafields: $metafields) {
+    metafields {
+      id
+      key
+      value
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}
+`;
 export const FILE_CREATE = `
       mutation fileCreate($files: [FileCreateInput!]!) {
         fileCreate(files: $files) {

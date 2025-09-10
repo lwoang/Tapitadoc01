@@ -30,7 +30,8 @@ export default function ManageShopifyImages() {
       const data = await response.json();
       const imagesWithStatus = data.images.map((img) => ({
         ...img,
-        status: "Unoptimized", // | Optimizing | Optimized | Restoring | Restored | Failed
+        status: "Unoptimized",
+        optimizedUrl: null,
       }));
       setImages(imagesWithStatus);
     } catch (err) {
@@ -67,7 +68,7 @@ export default function ManageShopifyImages() {
       setImages((prev) =>
         prev.map((img) =>
           img.id === imageId
-            ? { ...img, url: data.optimized, status: "Optimized" }
+            ? { ...img, optimizedUrl: data.optimized, status: "Optimized" }
             : img
         )
       );
@@ -85,7 +86,6 @@ export default function ManageShopifyImages() {
   };
 
   // Restore 1 ảnh
-
   const handleRestore = async (imageId, productId) => {
     try {
       setProcessingIds((prev) => [...prev, imageId]);
@@ -107,7 +107,7 @@ export default function ManageShopifyImages() {
       setImages((prev) =>
         prev.map((img) =>
           img.id === imageId
-            ? { ...img, url: data.originalUrl, status: "Restored" }
+            ? { ...img, optimizedUrl: null, status: "Restored" }
             : img
         )
       );
@@ -134,16 +134,12 @@ export default function ManageShopifyImages() {
       </Banner>
     );
 
-  // Convert images thành rows
-  const rows = images.map(
+  // Bảng 1: Ảnh gốc
+  const originalRows = images.map(
     ({ id, url, altText, productTitle, status, productId }) => {
       const isProcessing = processingIds.includes(id);
       return [
-        <Thumbnail
-          source={url}
-          alt={altText || "Product image"}
-          size="small"
-        />,
+        <Thumbnail source={url} alt={altText || "Product image"} size="small" />,
         <Tooltip content={productTitle}>
           <Text>{truncate(productTitle, 20)}</Text>
         </Tooltip>,
@@ -174,13 +170,43 @@ export default function ManageShopifyImages() {
     }
   );
 
+  // Bảng 2: Ảnh đã optimize (tự động live update)
+  const optimizedRows = images
+    .filter((img) => img.optimizedUrl)
+    .map(({ id, optimizedUrl, altText, productTitle, status }) => [
+      <Thumbnail
+        source={optimizedUrl}
+        alt={altText || "Optimized image"}
+        size="small"
+      />,
+      <Tooltip content={productTitle}>
+        <Text>{truncate(productTitle, 20)}</Text>
+      </Tooltip>,
+      altText ? (
+        <Tooltip content={altText}>
+          <Text>{truncate(altText, 40)}</Text>
+        </Tooltip>
+      ) : (
+        "-"
+      ),
+      <Text>{status}</Text>,
+    ]);
+
   return (
     <Page title="Manage Shopify Images">
-      <Card>
+      <Card title="Original Images" sectioned>
         <DataTable
           columnContentTypes={["text", "text", "text", "text", "text"]}
           headings={["Image", "Product", "Alt Text", "Status", "Actions"]}
-          rows={rows}
+          rows={originalRows}
+        />
+      </Card>
+
+      <Card title="Optimized Images" sectioned style={{ marginTop: "20px" }}>
+        <DataTable
+          columnContentTypes={["text", "text", "text", "text"]}
+          headings={["Optimized Image", "Product", "Alt Text", "Status"]}
+          rows={optimizedRows}
         />
       </Card>
     </Page>
