@@ -14,6 +14,8 @@ import {
   Tooltip,
   BlockStack,
   PageActions,
+  Modal,
+  DropZone,
 } from "@shopify/polaris";
 import Compressor from "compressorjs";
 
@@ -25,9 +27,19 @@ export default function ManageShopifyImages() {
   const [toastMessage, setToastMessage] = useState("");
   const [toastError, setToastError] = useState(false);
 
+  const [uploadModalActive, setUploadModalActive] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState([]);
+  const toggleUploadModal = () => setUploadModalActive(!uploadModalActive);
+
   useEffect(() => {
     fetchShopifyImages();
   }, []);
+
+  const showToast = (message, isError = false) => {
+    setToastMessage(message);
+    setToastError(isError);
+    setToastActive(true);
+  };
 
   const fetchShopifyImages = async () => {
     setLoadingShopify(true);
@@ -50,10 +62,33 @@ export default function ManageShopifyImages() {
     setLoadingShopify(false);
   };
 
-  const showToast = (message, isError = false) => {
-    setToastMessage(message);
-    setToastError(isError);
-    setToastActive(true);
+  // ----- Upload -----
+  const handleDrop = (newFiles) => setUploadFiles(newFiles);
+
+  const handleUpload = async () => {
+    if (uploadFiles.length === 0) return;
+    const formData = new FormData();
+    uploadFiles.forEach((file) => formData.append("images", file));
+
+    try {
+      const res = await fetch("/api/images/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Uploaded ${data.images.length} image(s) successfully!`, false);
+        fetchShopifyImages();
+      } else {
+        throw new Error(data.error || "Upload failed");
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+      showToast(`Upload error: ${err.message}`, true);
+    } finally {
+      setUploadFiles([]);
+      toggleUploadModal();
+    }
   };
 
   // ----- Optimize -----
@@ -111,7 +146,6 @@ export default function ManageShopifyImages() {
               : img
           )
         );
-
         showToast(`Optimized successfully!`, false);
       } else {
         throw new Error(data.error || "Unable to optimize image");
@@ -162,11 +196,13 @@ export default function ManageShopifyImages() {
       showToast(`Restore error: ${err.message}`, true);
     }
   };
+
   const truncateText = (text, maxLength = 28) => {
     if (!text) return "—";
     return text.length > maxLength ? text.slice(0, maxLength) + "…" : text;
   };
-  // ----- Table Rows 
+
+  // ----- Table Rows -----
   const rows = shopifyImages.map((item) => [
     <Thumbnail source={item.src} alt={item.productTitle || item.altText} size="small" />,
     <Tooltip content={item.productTitle || "No product name"}>
@@ -202,6 +238,8 @@ export default function ManageShopifyImages() {
     <Frame>
       <Page title="Optimize Images">
         <BlockStack gap="400">
+          <Button primary onClick={toggleUploadModal}>Upload New Image</Button>
+
           {shopifyImages.length === 0 && !loadingShopify && (
             <Banner tone="success">
               <p>All images have been optimized! No action required.</p>
@@ -231,6 +269,33 @@ export default function ManageShopifyImages() {
             primaryAction={{ content: "Refresh", onAction: fetchShopifyImages, loading: loadingShopify }}
           />
         </BlockStack>
+
+        {uploadModalActive && (
+          <Modal open={uploadModalActive} onClose={toggleUploadModal} title="Upload New Images">
+            <Modal.Section>
+              <DropZone onDrop={handleDrop} accept="image/*">
+                <DropZone.FileUpload />
+              </DropZone>
+              {uploadFiles.length > 0 && (
+                <div style={{ display: "flex", gap: "8px", marginTop: "16px", flexWrap: "wrap" }}>
+                  {uploadFiles.map((file, index) => (
+                    <Thumbnail
+                      key={index}
+                      source={URL.createObjectURL(file)}
+                      alt={`Preview ${index}`}
+                      size="small"
+                    />
+                  ))}
+                </div>
+              )}
+            </Modal.Section>
+            <Modal.Section>
+              <Button primary onClick={handleUpload} disabled={uploadFiles.length === 0}>
+                Upload
+              </Button>
+            </Modal.Section>
+          </Modal>
+        )}
       </Page>
       {toast}
     </Frame>

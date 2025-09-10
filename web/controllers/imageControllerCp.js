@@ -1,0 +1,222 @@
+import ImageModel from "../models/ImageModel.js";
+import shopify from "../config/shopify.js";
+import sharp from "sharp";
+import FormData from "form-data";
+import fetch from "node-fetch";
+import axios from "axios";
+import {
+  PRODUCTS_WITH_IMAGES_QUERY,
+  CREATE_STAGED_UPLOAD_MUTATION,
+  CREATE_PRODUCT_MEDIA_MUTATION,
+  DELETE_MEDIA_MUTATION,
+  IMAGE_QUERY,
+  FILE_CREATE,
+} from "../queries/imageQueries.js";
+import { uploadToShopifyStaged } from "../services/shopifyUpload.js";
+
+// --- Lấy ảnh Shopify
+export async function fetchShopifyImages(req, res) {
+  try {
+    const session = res.locals.shopify.session;
+    const client = new shopify.api.clients.Graphql({ session });
+
+    let allProducts = [];
+    let after = null;
+    const first = 50;
+
+    do {
+      const variables = { first, after };
+      const response = await client.query({
+        data: { query: PRODUCTS_WITH_IMAGES_QUERY, variables },
+      });
+
+      const data = response.body.data;
+      const products = data.products.edges.map((edge) => edge.node);
+      allProducts = allProducts.concat(products);
+
+      after = data.products.pageInfo.hasNextPage
+        ? data.products.pageInfo.endCursor
+        : null;
+    } while (after);
+    // Lấy tất cả ảnh từ tất cả sản phẩm
+    const allImages = allProducts.flatMap((product) =>
+      product.images.edges.map((imageEdge) => ({
+        productId: product.id,
+        productTitle: product.title,
+        ...imageEdge.node,
+      }))
+    );
+
+    res.json({ products: allProducts, images: allImages });
+  } catch (error) {
+    console.error("Error fetching Shopify images:", error);
+    res.status(500).json({ error: "Lỗi khi lấy sản phẩm/ảnh từ Shopify" });
+  }
+}
+
+// Optimize ảnh
+export async function optimizeImage(req, res) {
+  try {
+    const { productId, imageId } = req.body;
+    if (!productId || !imageId) {
+      return res.status(400).json({ error: "Thiếu productId hoặc imageId" });
+    }
+
+    const session = res.locals.shopify.session;
+    const client = new shopify.api.clients.Graphql({ session });
+
+    //Lấy ảnh gốc
+    const response = await client.query({
+      data: { query: IMAGE_QUERY, variables: { productId } },
+    });
+
+    const product = response.body.data.product;
+    const imageEdge = product.images.edges.find(
+      (edge) => edge.node.id === imageId
+    );
+    const image = imageEdge?.node;
+    if (!image) {
+      return res.status(404).json({ error: "Không tìm thấy ảnh" });
+    }
+
+    //Download ảnh
+    const resp = await fetch(image.url);
+    if (!resp.ok) throw new Error(`Lỗi tải ảnh: ${resp.status}`);
+    const buffer = Buffer.from(await resp.arrayBuffer());
+
+    //Optimize
+    const imageSharp = sharp(buffer);
+    const metadata = await imageSharp.metadata();
+
+    const optimizedBuffer = await imageSharp.webp({ quality: 80 }).toBuffer();
+
+    const mimeType = `image/${metadata.format}`;
+
+    // Tạo upload
+    const stagedRes = await client.query({
+      data: {
+        query: CREATE_STAGED_UPLOAD_MUTATION,
+        variables: {
+          input: [
+            {
+              filename: `optimized.${metadata.format}`,
+              mimeType,
+              fileSize: optimizedBuffer.length.toString(),
+              resource: "IMAGE",
+              httpMethod: "POST",
+            },
+          ],
+        },
+      },
+    });
+
+    const stagedTarget =
+      stagedRes.body.data.stagedUploadsCreate.stagedTargets[0];
+
+    // Upload file lên Shopify storage
+    const form = new FormData();
+    stagedTarget.parameters.forEach(({ name, value }) =>
+      form.append(name, value)
+    );
+    form.append("file", optimizedBuffer, {
+      filename: `Op-optimized.${metadata.format}`,
+      contentType: mimeType,
+    });
+
+    await axios.post(stagedTarget.url, form, {
+      headers: form.getHeaders(),
+    });
+
+    // fileCreate
+    const fileCreateRes = await client.query({
+      data: {
+        query: FILE_CREATE,
+        variables: {
+          files: [
+            {
+              alt: image.altText || product.title,
+              contentType: "IMAGE",
+              originalSource: stagedTarget.resourceUrl,
+            },
+          ],
+        },
+      },
+    });
+
+    const fileResult = fileCreateRes.body.data.fileCreate;
+    if (fileResult.userErrors.length > 0) {
+      throw new Error(
+        "Shopify fileCreate error: " + JSON.stringify(fileResult.userErrors)
+      );
+    }
+
+    res.json({ success: true, file: fileResult.files[0] });
+  } catch (err) {
+    console.error("Error optimizing image:", err);
+    res
+      .status(500)
+      .json({ error: "Lỗi khi optimize ảnh", details: err.message });
+  }
+}
+
+// --- Restore ảnh ---
+export async function restoreImage(req, res) {
+  try {
+    const { productId, imageId, mediaId } = req.body;
+    if (!productId || !imageId)
+      return res
+        .status(400)
+        .json({ success: false, error: "Missing productId or imageId" });
+
+    const session = res.locals.shopify.session;
+    const client = new shopify.api.clients.Graphql({ session });
+
+    if (mediaId) {
+      const productGid = productId.startsWith("gid://")
+        ? productId
+        : `gid://shopify/Product/${productId}`;
+      const mediaResult = await client.query({
+        data: {
+          query: DELETE_MEDIA_MUTATION,
+          variables: { productId: productGid, mediaIds: [mediaId] },
+        },
+      });
+      const userErrors =
+        mediaResult.body.data?.productDeleteMedia?.userErrors || [];
+      if (userErrors.length > 0)
+        console.warn(
+          `Shopify delete media errors: ${JSON.stringify(userErrors)}`
+        );
+    }
+
+    const updated = await ImageModel.findOneAndUpdate(
+      { productId, imageId },
+      {
+        $set: {
+          status: "unoptimized",
+          optimizedUrl: null,
+          mediaId: null,
+          filename: null,
+          optimizedAt: null,
+          optimizedSize: null,
+          compressionRatio: null,
+        },
+      },
+      { new: true }
+    );
+
+    if (!updated)
+      return res
+        .status(404)
+        .json({ success: false, error: "Image not found in DB" });
+
+    res.json({
+      success: true,
+      message: "Image restored and Shopify media deleted",
+      image: updated,
+    });
+  } catch (err) {
+    console.error("Restore error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+}

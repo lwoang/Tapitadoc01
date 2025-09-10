@@ -21,7 +21,7 @@ export default function App() {
             <Link to="/pagename">Page Name</Link>
             <Link to="/dashboard">Dashboard</Link> */}
             <Link to="/admin/edit-content">Edit Content</Link>
-            <Link to="/admin/optimize-image">Optimize Image</Link>
+            <Link to="/admin/optimize-image-copy">Optimize Image</Link>
           </NavMenu>
           <Routes pages={pages} />
         </QueryProvider>
