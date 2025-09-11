@@ -1,7 +1,13 @@
 import { shopifyRequest } from "../services/shopifyService.js";
 import { genAI } from "../services/genAIService.js";
-import { PRODUCT_QUERIES, PAGE_QUERIES, ARTICLE_QUERIES, PRODUCT_MUTATIONS, PAGE_MUTATIONS, ARTICLE_MUTATIONS } 
-from "../queries/editQueries.js";
+import {
+  PRODUCT_QUERIES,
+  PAGE_QUERIES,
+  ARTICLE_QUERIES,
+  PRODUCT_MUTATIONS,
+  PAGE_MUTATIONS,
+  ARTICLE_MUTATIONS,
+} from "../queries/editQueries.js";
 
 // GET all items
 export async function getAllItems(req, res) {
@@ -41,7 +47,9 @@ export async function getAllItems(req, res) {
     res.json({ success: true, items });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ success: false, error: "Failed to fetch data from Shopify" });
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to fetch data from Shopify" });
   }
 }
 
@@ -61,18 +69,33 @@ export async function getSingleItem(req, res) {
 
     let item = null;
     if (type === "products" && result.product) {
-      item = { id: result.product.id, title: result.product.title, description: result.product.description };
+      item = {
+        id: result.product.id,
+        title: result.product.title,
+        description: result.product.description,
+      };
     } else if (type === "pages" && result.page) {
-      item = { id: result.page.id, title: result.page.title, description: result.page.body };
+      item = {
+        id: result.page.id,
+        title: result.page.title,
+        description: result.page.body,
+      };
     } else if (type === "articles" && result.article) {
-      item = { id: result.article.id, title: result.article.title, description: result.article.body };
+      item = {
+        id: result.article.id,
+        title: result.article.title,
+        description: result.article.body,
+      };
     }
 
-    if (!item) return res.status(404).json({ success: false, error: "Item not found" });
+    if (!item)
+      return res.status(404).json({ success: false, error: "Item not found" });
     res.json({ success: true, item });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ success: false, error: "Failed to fetch item from Shopify" });
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to fetch item from Shopify" });
   }
 }
 
@@ -94,27 +117,49 @@ export async function updateItem(req, res) {
     } else if (type === "articles") {
       mutation = ARTICLE_MUTATIONS.UPDATE;
       variables = { id, article: { title, body: description } };
-    } else return res.status(400).json({ success: false, error: "Invalid type" });
+    } else
+      return res.status(400).json({ success: false, error: "Invalid type" });
 
     const result = await shopifyRequest(session, mutation, variables);
 
     let updatedItem = null;
-    if (type === "products" && result.productUpdate?.product) updatedItem = { id: result.productUpdate.product.id, title: result.productUpdate.product.title, description: result.productUpdate.product.descriptionHtml };
-    else if (type === "pages" && result.pageUpdate?.page) updatedItem = { id: result.pageUpdate.page.id, title: result.pageUpdate.page.title, description: result.pageUpdate.page.body };
-    else if (type === "articles" && result.articleUpdate?.article) updatedItem = { id: result.articleUpdate.article.id, title: result.articleUpdate.article.title, description: result.articleUpdate.article.body };
+    if (type === "products" && result.productUpdate?.product)
+      updatedItem = {
+        id: result.productUpdate.product.id,
+        title: result.productUpdate.product.title,
+        description: result.productUpdate.product.descriptionHtml,
+      };
+    else if (type === "pages" && result.pageUpdate?.page)
+      updatedItem = {
+        id: result.pageUpdate.page.id,
+        title: result.pageUpdate.page.title,
+        description: result.pageUpdate.page.body,
+      };
+    else if (type === "articles" && result.articleUpdate?.article)
+      updatedItem = {
+        id: result.articleUpdate.article.id,
+        title: result.articleUpdate.article.title,
+        description: result.articleUpdate.article.body,
+      };
 
     if (!updatedItem) {
       return res.status(400).json({
         success: false,
         error: "Update failed",
-        userErrors: result.productUpdate?.userErrors || result.pageUpdate?.userErrors || result.articleUpdate?.userErrors || [],
+        userErrors:
+          result.productUpdate?.userErrors ||
+          result.pageUpdate?.userErrors ||
+          result.articleUpdate?.userErrors ||
+          [],
       });
     }
 
     res.json({ success: true, item: updatedItem });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ success: false, error: "Failed to update Shopify data" });
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to update Shopify data" });
   }
 }
 
@@ -122,7 +167,10 @@ export async function updateItem(req, res) {
 export async function generateAISuggestion(req, res) {
   try {
     const { title, type } = req.body;
-    if (!title || !type) return res.status(400).json({ success: false, error: "Missing title or type" });
+    if (!title || !type)
+      return res
+        .status(400)
+        .json({ success: false, error: "Missing title or type" });
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `Write a single short description (1-2 sentences), engaging for the ${type} titled: "${title}". Do not explain, output only one paragraph.`;
@@ -132,6 +180,8 @@ export async function generateAISuggestion(req, res) {
     res.json({ success: true, suggestion });
   } catch (error) {
     console.error("Error generating suggestion:", error);
-    res.status(500).json({ success: false, error: "Failed to generate suggestion" });
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to generate suggestion" });
   }
 }

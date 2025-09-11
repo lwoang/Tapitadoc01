@@ -1,0 +1,31 @@
+{% schema %}
+{
+  "name": "Replace P",
+  "target": "section"
+}
+{% endschema %}
+
+{% if product %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const optimizedUrl = "{{ product.metafields.optimized_images.opUrl | escape }}";
+
+  if (!optimizedUrl) {
+    console.log("No optimized URL:", "{{ product.title | escape }}");
+    return;
+  }
+
+  console.log("Optimized URL:", "{{ product.title | escape }}", optimizedUrl);
+
+  const imgs = document.querySelectorAll(".product__media img");
+  imgs.forEach(img => {
+    console.log("Replacing:", img.src, "→", optimizedUrl);
+    img.src = optimizedUrl;
+
+    if (img.hasAttribute("srcset")) {
+      img.srcset = optimizedUrl;
+    }
+  });
+});
+</script>
+{% endif %}

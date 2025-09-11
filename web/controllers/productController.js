@@ -1,10 +1,5 @@
 import shopify from "../config/shopify.js";
 
-/**
- * Hàm để tạo một số sản phẩm giả.
- * (Đã di chuyển logic từ product-creator.js vào đây)
- * @param {object} session - Phiên Shopify.
- */
 const createProductsHelper = async (session) => {
   const client = new shopify.api.clients.Graphql({ session });
   const product = {
@@ -29,11 +24,7 @@ const createProductsHelper = async (session) => {
   console.log("Created product:", createProduct.data.productCreate.product);
 };
 
-/**
- * Lấy số lượng sản phẩm từ Shopify.
- * @param {object} _req - Đối tượng request (không sử dụng).
- * @param {object} res - Đối tượng response.
- */
+
 export const getProductCount = async (_req, res) => {
   try {
     const client = new shopify.api.clients.Graphql({
@@ -56,11 +47,6 @@ export const getProductCount = async (_req, res) => {
   }
 };
 
-/**
- * Tạo một số sản phẩm giả.
- * @param {object} _req - Đối tượng request (không sử dụng).
- * @param {object} res - Đối tượng response.
- */
 export const createProducts = async (_req, res) => {
   let status = 200;
   let error = null;

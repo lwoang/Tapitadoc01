@@ -22,16 +22,22 @@ export default function ManageShopifyImages() {
     return text.length > maxLength ? text.slice(0, maxLength) + "…" : text;
   }
 
-  // Fetch images từ backend
+  function formatFileSize(bytes) {
+    if (!bytes) return "-";
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return parseFloat((bytes / Math.pow(1024, i)).toFixed(2)) + " " + sizes[i];
+  }
+
   const fetchShopifyImages = async () => {
     try {
       const response = await fetch("/api/images/shopify");
       if (!response.ok) throw new Error("Failed to fetch images");
       const data = await response.json();
+
       const imagesWithStatus = data.images.map((img) => ({
         ...img,
-        status: "Unoptimized",
-        optimizedUrl: null,
+        status: img.optimized ? "Optimized" : "Unoptimized",
       }));
       setImages(imagesWithStatus);
     } catch (err) {
@@ -46,7 +52,6 @@ export default function ManageShopifyImages() {
     fetchShopifyImages();
   }, []);
 
-  // Optimize 1 ảnh
   const handleOptimize = async (imageId, productId) => {
     try {
       setProcessingIds((prev) => [...prev, imageId]);
@@ -63,12 +68,18 @@ export default function ManageShopifyImages() {
       });
 
       if (!response.ok) throw new Error("Optimize failed");
-      const data = await response.json();
+      const data = await response.json(); 
+      // backend nên trả về { optimizedUrl, optimizedFileSize }
 
       setImages((prev) =>
         prev.map((img) =>
           img.id === imageId
-            ? { ...img, optimizedUrl: data.optimized, status: "Optimized" }
+            ? {
+                ...img,
+                optimizedUrl: data.optimizedUrl,
+                optimizedFileSize: data.optimizedFileSize,
+                status: "Optimized",
+              }
             : img
         )
       );
@@ -85,7 +96,6 @@ export default function ManageShopifyImages() {
     }
   };
 
-  // Restore 1 ảnh
   const handleRestore = async (imageId, productId) => {
     try {
       setProcessingIds((prev) => [...prev, imageId]);
@@ -102,12 +112,16 @@ export default function ManageShopifyImages() {
       });
 
       if (!response.ok) throw new Error("Restore failed");
-      const data = await response.json();
 
       setImages((prev) =>
         prev.map((img) =>
           img.id === imageId
-            ? { ...img, optimizedUrl: null, status: "Restored" }
+            ? {
+                ...img,
+                optimizedUrl: null,
+                optimizedFileSize: null,
+                status: "Restored",
+              }
             : img
         )
       );
@@ -134,34 +148,54 @@ export default function ManageShopifyImages() {
       </Banner>
     );
 
-  // Bảng 1: Ảnh gốc
   const originalRows = images.map(
-    ({ id, url, altText, productTitle, status, productId }) => {
+    ({
+      id,
+      url,
+      altText,
+      productTitle,
+      status,
+      productId,
+      fileSize, // dung lượng gốc
+      optimizedFileSize, // dung lượng ảnh đã optimize
+      optimizedUrl,
+    }) => {
       const isProcessing = processingIds.includes(id);
       return [
         <Thumbnail source={url} alt={altText || "Product image"} size="small" />,
+        optimizedUrl ? (
+          <Thumbnail source={optimizedUrl} alt="Optimized" size="small" />
+        ) : (
+          "-"
+        ),
         <Tooltip content={productTitle}>
           <Text>{truncate(productTitle, 20)}</Text>
         </Tooltip>,
         altText ? (
           <Tooltip content={altText}>
-            <Text>{truncate(altText, 40)}</Text>
+            <Text>{truncate(altText, 30)}</Text>
           </Tooltip>
         ) : (
           "-"
         ),
+        <Text>{formatFileSize(fileSize)}</Text>,
+        <Text>
+          {optimizedUrl ? formatFileSize(optimizedFileSize) : "-"}
+        </Text>,
         <Text>{status}</Text>,
         <div style={{ display: "flex", gap: "6px" }}>
           <Button
             variant="primary"
             onClick={() => handleOptimize(id, productId)}
             loading={isProcessing && status === "Optimizing"}
+            disabled={status === "Optimized"}
           >
             Optimize
           </Button>
           <Button
             onClick={() => handleRestore(id, productId)}
             loading={isProcessing && status === "Restoring"}
+            disabled={status !== "Optimized"}
           >
             Restore
           </Button>
@@ -170,43 +204,31 @@ export default function ManageShopifyImages() {
     }
   );
 
-  // Bảng 2: Ảnh đã optimize (tự động live update)
-  const optimizedRows = images
-    .filter((img) => img.optimizedUrl)
-    .map(({ id, optimizedUrl, altText, productTitle, status }) => [
-      <Thumbnail
-        source={optimizedUrl}
-        alt={altText || "Optimized image"}
-        size="small"
-      />,
-      <Tooltip content={productTitle}>
-        <Text>{truncate(productTitle, 20)}</Text>
-      </Tooltip>,
-      altText ? (
-        <Tooltip content={altText}>
-          <Text>{truncate(altText, 40)}</Text>
-        </Tooltip>
-      ) : (
-        "-"
-      ),
-      <Text>{status}</Text>,
-    ]);
-
   return (
     <Page title="Manage Shopify Images">
-      <Card title="Original Images" sectioned>
+      <Card title="Images" sectioned>
         <DataTable
-          columnContentTypes={["text", "text", "text", "text", "text"]}
-          headings={["Image", "Product", "Alt Text", "Status", "Actions"]}
+          columnContentTypes={[
+            "text",
+            "text",
+            "text",
+            "text",
+            "text",
+            "text",
+            "text",
+            "text",
+          ]}
+          headings={[
+            "Original",
+            "Optimized",
+            "Product",
+            "Alt Text",
+            "Original",
+            "Optimized Size",
+            "Status",
+            "Actions",
+          ]}
           rows={originalRows}
-        />
-      </Card>
-
-      <Card title="Optimized Images" sectioned style={{ marginTop: "20px" }}>
-        <DataTable
-          columnContentTypes={["text", "text", "text", "text"]}
-          headings={["Optimized Image", "Product", "Alt Text", "Status"]}
-          rows={optimizedRows}
         />
       </Card>
     </Page>

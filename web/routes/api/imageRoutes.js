@@ -5,7 +5,7 @@ import {
   fetchShopifyImages,
   optimizeImage,
   restoreImage
-} from "../../controllers/imageControllerCp.js";
+} from "../../controllers/imageControllerLast.js";
 
 const router = express.Router();
 const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } });
