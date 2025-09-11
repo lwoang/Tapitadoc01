@@ -1,5 +1,5 @@
 import shopify from "../config/shopify.js";
-import Store from "../models/store.js";
+import Store from "../models/Store.js";
 
 export const getShopInfo = async (req, res) => {
   try {

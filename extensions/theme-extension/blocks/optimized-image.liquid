@@ -1,17 +1,10 @@
-{% schema %}
-{
-  "name": "Replace P",
-  "target": "section"
-}
-{% endschema %}
-
 {% if product %}
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   const optimizedUrl = "{{ product.metafields.optimized_images.opUrl | escape }}";
 
   if (!optimizedUrl) {
-    console.log("No optimized URL:", "{{ product.title | escape }}");
+    console.log("ko co optimized URL:", "{{ product.title | escape }}");
     return;
   }
 
@@ -19,13 +12,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const imgs = document.querySelectorAll(".product__media img");
   imgs.forEach(img => {
-    console.log("Replacing:", img.src, "→", optimizedUrl);
     img.src = optimizedUrl;
-
     if (img.hasAttribute("srcset")) {
       img.srcset = optimizedUrl;
+      console.log("img.srcset:",  img.srcset);
     }
   });
 });
 </script>
 {% endif %}
+
+{% schema %}
+{
+  "name": "Replace P",
+  "target": "head"
+}
+{% endschema %}

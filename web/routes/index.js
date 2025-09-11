@@ -11,7 +11,7 @@ const router = Router();
 
 router.use(shopRoutes);
 router.use(productRoutes);
-router.use(authRoutes);
+router.use("/api", authRoutes);
 router.use("/api/images", imageRoutes);
 router.use("/edit", editRoutes);
 

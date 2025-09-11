@@ -1,35 +1,47 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import User from "../../models/user.js";
-import Store from "../../models/store.js";
+import User from "../../models/User.js";
+import Store from "../../models/Store.js";
 import { authMiddleware } from "../../middlewares/auth.js";
 
 const router = express.Router();
 
+// POST /api/login
 router.post("/login", async (req, res) => {
   const { username, password } = req.body;
-  console.log("Login attempt:", username, password);
 
-  const user = await User.findOne({ username });
-  console.log("User found:", user); 
-  if (!user) return res.status(400).json({ error: "Invalid credentials" });
+  try {
+    const user = await User.findOne({ username });
+    if (!user) return res.status(400).json({ error: "Invalid credentials" });
 
-  const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) return res.status(400).json({ error: "Invalid credentials" });
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) return res.status(400).json({ error: "Invalid credentials" });
 
-  const token = jwt.sign(
-    { id: user._id, username: user.username },
-    process.env.JWT_SECRET || "1234567890",
-    { expiresIn: "1h" }
-  );
+    const token = jwt.sign(
+      { id: user._id, username: user.username },
+      process.env.JWT_SECRET || "1234567890",
+      { expiresIn: "1h" }
+    );
 
-  res.json({ token });
+    // Lấy luôn danh sách stores sau login
+    const stores = await Store.find({});
+
+    res.json({ token, user: { username: user.username }, stores });
+  } catch (err) {
+    console.error("Login error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
-router.get("/stores", async (req, res) => {
-  const stores = await Store.find({});
-  res.json(stores);
+// GET /api/stores (protected)
+router.get("/stores", authMiddleware, async (req, res) => {
+  try {
+    const stores = await Store.find({});
+    res.json(stores);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 export default router;
