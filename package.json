@@ -19,7 +19,7 @@
     "@shopify/app-bridge-utils": "^3.5.1",
     "@shopify/polaris-icons": "^9.3.1",
     "@tailwindcss/cli": "^4.1.12",
-    "axios": "^1.11.0",
+    "axios": "^1.12.1",
     "bcrypt": "^6.0.0",
     "compressorjs": "^1.2.1",
     "cors": "^2.8.5",
