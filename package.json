@@ -27,7 +27,7 @@
     "form-data": "^4.0.4",
     "fs": "^0.0.1-security",
     "jsonwebtoken": "^9.0.2",
-    "lucide-react": "^0.542.0",
+    "lucide-react": "^0.552.0",
     "mongodb": "^6.19.0",
     "mongoose": "^8.18.0",
     "multer": "^2.0.2",
