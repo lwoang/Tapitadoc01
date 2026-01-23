@@ -22,7 +22,7 @@
     "axios": "^1.11.0",
     "bcrypt": "^6.0.0",
     "compressorjs": "^1.2.1",
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "fetch-blob": "^4.0.0",
     "form-data": "^4.0.4",
     "fs": "^0.0.1-security",
